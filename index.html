@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dott. Stefano Faralli - Calcolatore Nutrizionale</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #3498db;
+            --bg: #f4f7f6;
+            --card: #ffffff;
+            --text: #333;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 { color: var(--primary); }
+
+        /* Griglia Input */
+        .grid-ingredienti {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .card-ingrediente {
+            background: var(--card);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            transition: border 0.3s;
+        }
+
+        .ing-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .ing-header label {
+            font-weight: 600;
+            flex: 1;
+        }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .input-group input {
+            width: 80px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        /* Specchietto riepilogativo per 100g */
+        .ing-details {
+            background-color: #f9f9f9;
+            padding: 8px 10px;
+            border-radius: 5px;
+            border-left: 3px solid var(--accent);
+            font-size: 0.8em;
+            color: #555;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .ing-details strong { color: var(--primary); }
+
+        /* Pulsanti */
+        .controls {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .btn {
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 1.1rem;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.3s;
+        }
+
+        #btnCalcola {
+            background-color: var(--accent);
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+        }
+        #btnCalcola:hover { background-color: #2980b9; transform: translateY(-2px); }
+
+        #btnStampa {
+            background-color: #27ae60;
+            box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
+            margin-top: 30px;
+            display: none; /* Visibile solo dopo il calcolo */
+        }
+        #btnStampa:hover { background-color: #219653; transform: translateY(-2px); }
+
+        /* Risultati */
+        #sezioneRisultati {
+            display: none;
+            background: var(--card);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            animation: fadeIn 0.5s ease;
+            text-align: center;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .risultati-flex {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 30px;
+            align-items: center;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .chart-container {
+            flex: 1;
+            min-width: 250px;
+            max-width: 350px;
+        }
+
+        .tabella-riepilogo {
+            flex: 1;
+            min-width: 280px;
+        }
+
+        table { width: 100%; border-collapse: collapse; }
+        table th, table td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        .color-dot { height: 12px; width: 12px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+
+        /* =========================================
+           REGOLE PER L'ESPORTAZIONE IN PDF / STAMPA
+           ========================================= */
+        @media print {
+            body {
+                background: white;
+                color: black;
+                padding: 0;
+            }
+            
+            .controls, #btnStampa { display: none !important; }
+
+            .grid-ingredienti {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+
+            .card-ingrediente {
+                box-shadow: none;
+                border: 1px solid #ddd;
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
+
+            .input-group input {
+                border: none;
+                border-bottom: 1px solid #ccc;
+                border-radius: 0;
+                background: transparent;
+            }
+
+            #sezioneRisultati {
+                box-shadow: none;
+                padding: 10px 0;
+                margin-top: 30px;
+                border-top: 2px solid #2c3e50;
+                border-radius: 0;
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
+
+            .risultati-flex { flex-wrap: nowrap; }
+
+            canvas {
+                max-width: 100% !important;
+                height: auto !important;
+            }
+        }
+
+        /* Responsive Mobile */
+        @media (max-width: 600px) {
+            body { padding: 10px; }
+            .grid-ingredienti { grid-template-columns: 1fr; }
+            .btn { width: 100%; }
+            .ing-details { flex-wrap: wrap; gap: 5px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Calcolatore Nutrizionale</h1>
+        <p>Inserisci i grammi consumati (decimali consentiti). Lo specchietto indica i valori per 100g.</p>
+    </header>
+
+    <section id="formIngredienti" class="grid-ingredienti">
+        </section>
+
+    <div class="controls">
+        <button id="btnCalcola" class="btn">Calcola Riepilogo</button>
+    </div>
+
+    <section id="sezioneRisultati">
+        <h2>Riepilogo Nutrizionale Totale</h2>
+        <div class="risultati-flex">
+            <div class="chart-container">
+                <canvas id="nutriChart"></canvas>
+            </div>
+            <div class="tabella-riepilogo">
+                <table id="tabellaTotali">
+                    <thead>
+                        <tr>
+                            <th>Nutriente</th>
+                            <th>Grammi Totali</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bodyTabella">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+        <button id="btnStampa" class="btn">🖨️ Stampa / Salva come PDF</button>
+    </section>
+</div>
+
+<script>
+    Chart.register(ChartDataLabels);
+
+    const datiIngredienti = [
+        { nome: "Cereali Raffinati", pr: 9, li: 0.4, gl: 70, fb: 3 },
+        { nome: "Cereali Integrali", pr: 10, li: 1.6, gl: 55, fb: 9 },
+        { nome: "Legumi", pr: 5, li: 0.9, gl: 8, fb: 8 },
+        { nome: "Verdure Cotte", pr: 3, li: 0.5, gl: 4, fb: 4.5 },
+        { nome: "Verdure Crude", pr: 1.8, li: 0.4, gl: 2.2, fb: 1.5 },
+        { nome: "Frutta Fresca", pr: 1.2, li: 1, gl: 11, fb: 2.2 },
+        { nome: "Frutta Secca", pr: 16, li: 51, gl: 4, fb: 14.3 },
+        { nome: "Carne Rossa", pr: 19, li: 3, gl: 0.1, fb: 0 },
+        { nome: "Carne Bianca", pr: 20, li: 7, gl: 0.4, fb: 0 },
+        { nome: "Affettati", pr: 24, li: 20, gl: 0.9, fb: 0 },
+        { nome: "Pesce", pr: 17, li: 0.5, gl: 0.5, fb: 0 },
+        { nome: "Molluschi", pr: 10.2, li: 1.5, gl: 3.5, fb: 0 },
+        { nome: "Uova", pr: 13, li: 11.1, gl: 1, fb: 0 },
+        { nome: "Formaggi Freschi", pr: 12, li: 7, gl: 2.5, fb: 0 },
+        { nome: "Formaggi Stagionati", pr: 34, li: 26, gl: 0, fb: 0 },
+        { nome: "Latte", pr: 3.2, li: 2, gl: 5, fb: 0 },
+        { nome: "Yogurt", pr: 3.1, li: 9, gl: 0.1, fb: 0 },
+        { nome: "Olio", pr: 0, li: 100, gl: 0, fb: 0 },
+        { nome: "Dolci", pr: 9, li: 11, gl: 69, fb: 1.1 },
+        { nome: "Cioccolato", pr: 7.8, li: 37, gl: 49, fb: 1.2 },
+        { nome: "Vino", pr: 0, li: 0, gl: 0.2, fb: 0 },
+        { nome: "Birra", pr: 0.2, li: 0, gl: 3.5, fb: 0 }
+    ];
+
+    let chartInstance = null;
+    const container = document.getElementById('formIngredienti');
+
+    datiIngredienti.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'card-ingrediente';
+        div.innerHTML = `
+            <div class="ing-header">
+                <label for="ing-${index}">${item.nome}</label>
+                <div class="input-group">
+                    <input type="number" id="ing-${index}" placeholder="0" min="0" step="0.1" value="0">
+                    <span>g</span>
+                </div>
+            </div>
+            <div class="ing-details">
+                <span><strong>PR:</strong> ${item.pr}g</span>
+                <span><strong>LI:</strong> ${item.li}g</span>
+                <span><strong>GL:</strong> ${item.gl}g</span>
+                <span><strong>FB:</strong> ${item.fb}g</span>
+            </div>
+        `;
+        container.appendChild(div);
+    });
+
+    document.getElementById('btnCalcola').addEventListener('click', () => {
+        let totali = { pr: 0, li: 0, gl: 0, fb: 0 };
+
+        datiIngredienti.forEach((item, index) => {
+            const grammiInseriti = parseFloat(document.getElementById(`ing-${index}`).value) || 0;
+            const ratio = grammiInseriti / 100;
+
+            totali.pr += item.pr * ratio;
+            totali.li += item.li * ratio;
+            totali.gl += item.gl * ratio;
+            totali.fb += item.fb * ratio;
+        });
+
+        mostraRisultati(totali);
+    });
+
+    function mostraRisultati(totali) {
+        document.getElementById('sezioneRisultati').style.display = 'block';
+        document.getElementById('btnStampa').style.display = 'inline-block';
+
+        const bodyTabella = document.getElementById('bodyTabella');
+        const rows = [
+            { label: 'Proteine', val: totali.pr, color: '#ff6384' },
+            { label: 'Lipidi', val: totali.li, color: '#ffcd56' },
+            { label: 'Glucosio', val: totali.gl, color: '#36a2eb' },
+            { label: 'Fibre', val: totali.fb, color: '#4bc0c0' }
+        ];
+
+        bodyTabella.innerHTML = rows.map(r => `
+            <tr>
+                <td><span class="color-dot" style="background:${r.color}"></span>${r.label}</td>
+                <td><strong>${r.val.toFixed(2)} g</strong></td>
+            </tr>
+        `).join('');
+
+        // CALCOLO ESATTO DELLE PERCENTUALI (100%)
+        let datiTorta = [totali.pr, totali.li, totali.gl];
+        let sommaTorta = datiTorta.reduce((a, b) => a + b, 0);
+        let percentuali = [0, 0, 0];
+
+        if (sommaTorta > 0) {
+            // Calcola con un decimale
+            percentuali = datiTorta.map(v => parseFloat(((v / sommaTorta) * 100).toFixed(1)));
+            let sommaPerc = percentuali.reduce((a, b) => a + b, 0);
+            
+            // Se c'è un errore di arrotondamento (es. 99.9 o 100.1), compensa sul valore più alto
+            if (sommaPerc !== 100) {
+                let diff = parseFloat((100 - sommaPerc).toFixed(1));
+                let maxIdx = percentuali.indexOf(Math.max(...percentuali));
+                percentuali[maxIdx] = parseFloat((percentuali[maxIdx] + diff).toFixed(1));
+            }
+        }
+
+        const ctx = document.getElementById('nutriChart').getContext('2d');
+        if(chartInstance) { chartInstance.destroy(); }
+
+        chartInstance = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: ['Proteine', 'Lipidi', 'Glucosio'],
+                datasets: [{
+                    data: [totali.pr.toFixed(2), totali.li.toFixed(2), totali.gl.toFixed(2)],
+                    backgroundColor: ['#ff6384', '#ffcd56', '#36a2eb'],
+                    hoverOffset: 10
+                }]
+            },
+            options: {
+                responsive: true,
+                animation: { duration: 0 },
+                plugins: {
+                    legend: { position: 'bottom' },
+                    datalabels: {
+                        color: '#ffffff',
+                        font: { weight: 'bold', size: 14 },
+                        formatter: (value, context) => {
+                            if (value == 0) return '';
+                            // Formatta togliendo il .0 inutile, es "33.0%" diventa "33%"
+                            return percentuali[context.dataIndex].toString().replace('.0', '') + "%";
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                let value = context.parsed || 0;
+                                let strPerc = percentuali[context.dataIndex].toString().replace('.0', '') + "%";
+                                return `${label}: ${value}g (${strPerc})`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        window.scrollTo({
+            top: document.getElementById('sezioneRisultati').offsetTop - 20,
+            behavior: 'smooth'
+        });
+    }
+
+    document.getElementById('btnStampa').addEventListener('click', () => { window.print(); });
+</script>
+
+</body>
+</html>
